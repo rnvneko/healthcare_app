@@ -3,6 +3,7 @@ import { useStore } from './store/useStore';
 import Dashboard from './components/Dashboard';
 import FoodTracker from './components/FoodTracker';
 import TrainingTracker from './components/TrainingTracker';
+import WeightTracker from './components/WeightTracker';
 import RecipePlanner from './components/RecipePlanner';
 import BottomNav, { type Tab } from './components/BottomNav';
 import GoalEditor from './components/GoalEditor';
@@ -35,6 +36,7 @@ export default function App() {
             totalCarbs={store.totalCarbs}
             totalFat={store.totalFat}
             goals={store.state.goals}
+            latestWeight={store.latestWeight}
             onEditGoals={() => setShowGoalEditor(true)}
           />
         )}
@@ -57,6 +59,14 @@ export default function App() {
             totalCaloriesBurned={store.totalCaloriesBurned}
           />
         )}
+        {activeTab === 'weight' && (
+          <WeightTracker
+            entries={store.state.weightEntries}
+            goals={store.state.goals}
+            onUpsert={store.upsertWeightEntry}
+            onRemove={store.removeWeightEntry}
+          />
+        )}
         {activeTab === 'recipe' && (
           <RecipePlanner
             goals={store.state.goals}
@@ -66,10 +76,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom navigation */}
       <BottomNav active={activeTab} onChange={setActiveTab} />
 
-      {/* Goal editor modal */}
       {showGoalEditor && (
         <GoalEditor
           goals={store.state.goals}

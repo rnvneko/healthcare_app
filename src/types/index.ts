@@ -33,10 +33,29 @@ export interface DailyGoals {
   protein: number;
   carbs: number;
   fat: number;
+  targetWeight: number;
+  targetBodyFat?: number;
+}
+
+export interface WeightEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  weight: number; // kg (required)
+  bmi?: number;
+  bodyFat?: number; // %
+  bodyWater?: number; // %
+  muscleMass?: number; // kg
+  boneMass?: number; // kg
+  bmr?: number; // kcal
+  visceralFat?: number; // level
+  subcutaneousFat?: number; // %
+  proteinRate?: number; // %
+  bodyAge?: number; // 歳
 }
 
 export interface AppState {
   foodEntries: FoodEntry[];
   trainingSessions: TrainingSession[];
+  weightEntries: WeightEntry[];
   goals: DailyGoals;
 }

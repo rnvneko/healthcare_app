@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { TrainingSession, Exercise, TrainingSet } from '../types';
+import TrainingAdvice from './TrainingAdvice';
 
 interface Props {
   sessions: TrainingSession[];
@@ -94,6 +95,7 @@ function ExerciseRow({
 
 export default function TrainingTracker({ sessions, onAdd, onRemove, totalCaloriesBurned }: Props) {
   const [showForm, setShowForm] = useState(false);
+  const [showAdvice, setShowAdvice] = useState(false);
   const [sessionName, setSessionName] = useState('');
   const [duration, setDuration] = useState('60');
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -247,6 +249,23 @@ export default function TrainingTracker({ sessions, onAdd, onRemove, totalCalori
           ))
         )}
       </div>
+
+      {/* AI Advice button */}
+      <button
+        onClick={() => setShowAdvice(true)}
+        className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl py-3.5 font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-sm"
+      >
+        <span className="text-lg">✨</span>
+        AIトレーニングアドバイスをもらう
+      </button>
+
+      {/* AI Advice modal */}
+      {showAdvice && (
+        <TrainingAdvice
+          todaySessions={sessions}
+          onClose={() => setShowAdvice(false)}
+        />
+      )}
     </div>
   );
 }

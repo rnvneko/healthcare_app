@@ -1,4 +1,4 @@
-import type { DailyGoals } from '../types';
+import type { DailyGoals, WeightEntry } from '../types';
 
 interface Props {
   totalCaloriesIn: number;
@@ -7,6 +7,7 @@ interface Props {
   totalCarbs: number;
   totalFat: number;
   goals: DailyGoals;
+  latestWeight?: WeightEntry;
   onEditGoals: () => void;
 }
 
@@ -50,7 +51,7 @@ function MacroBar({ label, value, max, color }: { label: string; value: number; 
 }
 
 export default function Dashboard({
-  totalCaloriesIn, totalCaloriesBurned, totalProtein, totalCarbs, totalFat, goals, onEditGoals
+  totalCaloriesIn, totalCaloriesBurned, totalProtein, totalCarbs, totalFat, goals, latestWeight, onEditGoals
 }: Props) {
   const net = totalCaloriesIn - totalCaloriesBurned;
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
@@ -101,6 +102,28 @@ export default function Dashboard({
           <span className="text-xs text-gray-500 whitespace-nowrap">{goals.calories} kcal 目標</span>
         </div>
       </div>
+
+      {/* Weight summary */}
+      {latestWeight && (
+        <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-2xl">⚖️</div>
+          <div className="flex-1">
+            <p className="text-xs text-gray-500">最新の体重（{latestWeight.date}）</p>
+            <p className="text-2xl font-bold text-gray-900">{latestWeight.weight} <span className="text-sm font-normal text-gray-500">kg</span></p>
+            {latestWeight.bodyFat !== undefined && (
+              <p className="text-xs text-gray-500">体脂肪率: {latestWeight.bodyFat}%</p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-400">目標まで</p>
+            <p className={`text-lg font-bold ${latestWeight.weight > goals.targetWeight ? 'text-red-500' : 'text-green-500'}`}>
+              {latestWeight.weight > goals.targetWeight
+                ? `-${(latestWeight.weight - goals.targetWeight).toFixed(1)}kg`
+                : '達成！🎉'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Progress Rings */}
       <div className="bg-white rounded-2xl shadow-sm p-4">

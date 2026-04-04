@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { FoodEntry, TrainingSession, DailyGoals, AppState, WeightEntry } from '../types';
+import type { FoodEntry, TrainingSession, DailyGoals, AppState, WeightEntry, AIHistoryEntry } from '../types';
 
 const STORAGE_KEY = 'fitness_app_data';
 
@@ -16,15 +16,15 @@ function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // migrate: add missing fields
       return {
         weightEntries: [],
+        aiHistory: [],
         ...parsed,
         goals: { ...defaultGoals, ...parsed.goals },
       };
     }
   } catch {}
-  return { foodEntries: [], trainingSessions: [], weightEntries: [], goals: defaultGoals };
+  return { foodEntries: [], trainingSessions: [], weightEntries: [], aiHistory: [], goals: defaultGoals };
 }
 
 function saveState(state: AppState) {
@@ -98,6 +98,28 @@ export function useStore() {
     update(prev => ({ ...prev, weightEntries: prev.weightEntries.filter(w => w.date !== date) }));
   }, [update]);
 
+  // --- AI History ---
+  const addAIHistory = useCallback((entry: Omit<AIHistoryEntry, 'id' | 'createdAt'>) => {
+    update(prev => ({
+      ...prev,
+      aiHistory: [
+        { ...entry, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
+        ...prev.aiHistory,
+      ],
+    }));
+  }, [update]);
+
+  const updateAIHistoryDate = useCallback((id: string, registeredDate: string) => {
+    update(prev => ({
+      ...prev,
+      aiHistory: prev.aiHistory.map(h => h.id === id ? { ...h, registeredDate } : h),
+    }));
+  }, [update]);
+
+  const removeAIHistory = useCallback((id: string) => {
+    update(prev => ({ ...prev, aiHistory: prev.aiHistory.filter(h => h.id !== id) }));
+  }, [update]);
+
   // --- Goals ---
   const updateGoals = useCallback((goals: DailyGoals) => {
     update(prev => ({ ...prev, goals }));
@@ -138,6 +160,9 @@ export function useStore() {
     removeTrainingSession,
     upsertWeightEntry,
     removeWeightEntry,
+    addAIHistory,
+    updateAIHistoryDate,
+    removeAIHistory,
     updateGoals,
   };
 }

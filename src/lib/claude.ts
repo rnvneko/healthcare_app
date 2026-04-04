@@ -9,9 +9,8 @@ function getClient() {
 async function streamText(prompt: string, onChunk: (text: string) => void) {
   const client = getClient();
   const stream = client.messages.stream({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
-    thinking: { type: 'adaptive' },
     messages: [{ role: 'user', content: prompt }],
   });
   for await (const event of stream) {

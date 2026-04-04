@@ -7,6 +7,7 @@ interface Props {
   onAdd: (session: Omit<TrainingSession, 'id' | 'timestamp'>) => void;
   onRemove: (id: string) => void;
   totalCaloriesBurned: number;
+  onSaveAdviceHistory: (title: string, content: string, date: string) => void;
 }
 
 const EXERCISE_PRESETS = [
@@ -93,7 +94,7 @@ function ExerciseRow({
   );
 }
 
-export default function TrainingTracker({ sessions, onAdd, onRemove, totalCaloriesBurned }: Props) {
+export default function TrainingTracker({ sessions, onAdd, onRemove, totalCaloriesBurned, onSaveAdviceHistory }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [showAdvice, setShowAdvice] = useState(false);
   const [sessionName, setSessionName] = useState('');
@@ -264,6 +265,7 @@ export default function TrainingTracker({ sessions, onAdd, onRemove, totalCalori
         <TrainingAdvice
           todaySessions={sessions}
           onClose={() => setShowAdvice(false)}
+          onSaveHistory={onSaveAdviceHistory}
         />
       )}
     </div>

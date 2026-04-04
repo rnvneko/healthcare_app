@@ -1,21 +1,21 @@
-type Tab = 'dashboard' | 'food' | 'training' | 'weight' | 'recipe';
+type Tab = 'dashboard' | 'food' | 'training' | 'recipe';
 
 interface Props {
   active: Tab;
   onChange: (tab: Tab) => void;
+  hidden?: boolean;
 }
 
 const TABS: { id: Tab; icon: string; label: string }[] = [
   { id: 'dashboard', icon: '📊', label: 'ダッシュボード' },
-  { id: 'food', icon: '🍱', label: '食事' },
-  { id: 'training', icon: '💪', label: 'トレーニング' },
-  { id: 'weight', icon: '📅', label: '体重' },
-  { id: 'recipe', icon: '✨', label: 'レシピAI' },
+  { id: 'food',      icon: '🍱', label: '食事' },
+  { id: 'training',  icon: '💪', label: 'トレーニング' },
+  { id: 'recipe',    icon: '✨', label: 'レシピAI' },
 ];
 
-export default function BottomNav({ active, onChange }: Props) {
+export default function BottomNav({ active, onChange, hidden }: Props) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-50">
+    <nav className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-50 transition-transform duration-300 ${hidden ? 'translate-y-full' : 'translate-y-0'}`}>
       {TABS.map(({ id, icon, label }) => (
         <button
           key={id}

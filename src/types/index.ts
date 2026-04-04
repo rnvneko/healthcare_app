@@ -55,9 +55,19 @@ export interface WeightEntry {
   bodyAge?: number; // 歳
 }
 
+export interface AIHistoryEntry {
+  id: string;
+  type: 'recipe' | 'training';
+  title: string;
+  content: string;
+  createdAt: string; // ISO timestamp
+  registeredDate?: string; // YYYY-MM-DD
+}
+
 export interface AppState {
   foodEntries: FoodEntry[];
   trainingSessions: TrainingSession[];
   weightEntries: WeightEntry[];
+  aiHistory: AIHistoryEntry[];
   goals: DailyGoals;
 }

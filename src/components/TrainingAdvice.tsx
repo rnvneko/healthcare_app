@@ -5,6 +5,7 @@ import type { TrainingSession } from '../types';
 interface Props {
   todaySessions: TrainingSession[];
   onClose: () => void;
+  onSaveHistory: (title: string, content: string, date: string) => void;
 }
 
 const TIME_OPTIONS = [30, 45, 60, 90, 120];
@@ -35,7 +36,7 @@ function MarkdownText({ text }: { text: string }) {
   );
 }
 
-export default function TrainingAdvice({ todaySessions, onClose }: Props) {
+export default function TrainingAdvice({ todaySessions, onClose, onSaveHistory }: Props) {
   const [availableTime, setAvailableTime] = useState(60);
   const [targetCalories, setTargetCalories] = useState(400);
   const [targetMuscles, setTargetMuscles] = useState<string[]>([]);
@@ -45,6 +46,8 @@ export default function TrainingAdvice({ todaySessions, onClose }: Props) {
   const [advice, setAdvice] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registerDate, setRegisterDate] = useState(new Date().toISOString().slice(0, 10));
+  const [registered, setRegistered] = useState(false);
 
   function toggleMuscle(m: string) {
     setTargetMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -78,6 +81,7 @@ export default function TrainingAdvice({ todaySessions, onClose }: Props) {
         full += chunk;
         setAdvice(full);
       });
+      setRegistered(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'アドバイスの生成に失敗しました');
     } finally {
@@ -209,9 +213,34 @@ export default function TrainingAdvice({ todaySessions, onClose }: Props) {
           {advice && (
             <div className="bg-white rounded-2xl p-4">
               <MarkdownText text={advice} />
-              {loading && (
+              {loading ? (
                 <div className="mt-2 flex items-center gap-2 text-indigo-500 text-sm">
                   <span className="animate-pulse">●</span><span>生成中...</span>
+                </div>
+              ) : (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  {registered ? (
+                    <p className="text-sm text-green-600 text-center font-medium">✅ カレンダーに登録しました</p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={registerDate}
+                        onChange={e => setRegisterDate(e.target.value)}
+                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      />
+                      <button
+                        onClick={() => {
+                          const title = `${targetMuscles.join('・')} トレーニング (${availableTime}分)`;
+                          onSaveHistory(title, advice, registerDate);
+                          setRegistered(true);
+                        }}
+                        className="bg-indigo-500 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"
+                      >
+                        📅 登録
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

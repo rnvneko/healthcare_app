@@ -6,6 +6,7 @@ interface Props {
   goals: DailyGoals;
   remainingCalories: number;
   remainingProtein: number;
+  onSaveHistory: (title: string, content: string, date: string) => void;
 }
 
 const MEAL_TYPES = ['朝食', '昼食', '夕食', 'スナック', 'プレワークアウト', 'ポストワークアウト'];
@@ -46,7 +47,7 @@ function MarkdownText({ text }: { text: string }) {
   );
 }
 
-export default function RecipePlanner({ remainingCalories, remainingProtein }: Props) {
+export default function RecipePlanner({ remainingCalories, remainingProtein, onSaveHistory }: Props) {
   const [mealType, setMealType] = useState('昼食');
   const [targetCalories, setTargetCalories] = useState(String(Math.max(300, Math.round(remainingCalories / 2))));
   const [targetProtein, setTargetProtein] = useState(String(Math.max(20, Math.round(remainingProtein / 2))));
@@ -57,6 +58,8 @@ export default function RecipePlanner({ remainingCalories, remainingProtein }: P
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<{ mealType: string; recipe: string }[]>([]);
+  const [registerDate, setRegisterDate] = useState(new Date().toISOString().slice(0, 10));
+  const [registered, setRegistered] = useState(false);
 
   async function handleGenerate() {
     setError('');
@@ -80,6 +83,7 @@ export default function RecipePlanner({ remainingCalories, remainingProtein }: P
         },
       );
       setHistory(prev => [{ mealType, recipe: full }, ...prev.slice(0, 4)]);
+      setRegistered(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'レシピの生成に失敗しました');
     } finally {
@@ -228,6 +232,32 @@ export default function RecipePlanner({ remainingCalories, remainingProtein }: P
             <div className="mt-3 flex items-center gap-2 text-indigo-500 text-sm">
               <span className="animate-pulse">●</span>
               <span>生成中...</span>
+            </div>
+          )}
+          {!loading && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              {registered ? (
+                <p className="text-sm text-green-600 text-center font-medium">✅ カレンダーに登録しました</p>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={registerDate}
+                    onChange={e => setRegisterDate(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  <button
+                    onClick={() => {
+                      const title = recipe.split('\n').find(l => l.startsWith('## '))?.replace('## ', '') ?? `${mealType}レシピ`;
+                      onSaveHistory(title, recipe, registerDate);
+                      setRegistered(true);
+                    }}
+                    className="bg-indigo-500 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"
+                  >
+                    📅 登録
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

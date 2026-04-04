@@ -1,17 +1,47 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useStore } from './store/useStore';
 import Dashboard from './components/Dashboard';
 import FoodTracker from './components/FoodTracker';
 import TrainingTracker from './components/TrainingTracker';
 import WeightTracker from './components/WeightTracker';
 import RecipePlanner from './components/RecipePlanner';
+import AICalendar from './components/AICalendar';
 import BottomNav, { type Tab } from './components/BottomNav';
 import GoalEditor from './components/GoalEditor';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [showGoalEditor, setShowGoalEditor] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
   const store = useStore();
+
+  const lastScrollY = useRef(0);
+  const scrollThreshold = useRef(0);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const currentY = e.currentTarget.scrollTop;
+    const delta = currentY - lastScrollY.current;
+
+    scrollThreshold.current += delta;
+    if (scrollThreshold.current > 40) {
+      setNavHidden(true);
+      scrollThreshold.current = 0;
+    } else if (scrollThreshold.current < -20 || currentY < 50) {
+      setNavHidden(false);
+      scrollThreshold.current = 0;
+    }
+    lastScrollY.current = currentY;
+  }, []);
+
+  const handleTabChange = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    setNavHidden(false);
+    scrollThreshold.current = 0;
+  }, []);
+
+  function handleSaveAIHistory(type: 'recipe' | 'training', title: string, content: string, date: string) {
+    store.addAIHistory({ type, title, content, registeredDate: date });
+  }
 
   return (
     <div className="min-h-dvh bg-gray-50 flex flex-col">
@@ -27,19 +57,35 @@ export default function App() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto pb-20">
+      <main className="flex-1 overflow-y-auto pb-20" onScroll={handleScroll}>
         {activeTab === 'dashboard' && (
-          <Dashboard
-            totalCaloriesIn={store.totalCaloriesIn}
-            totalCaloriesBurned={store.totalCaloriesBurned}
-            totalProtein={store.totalProtein}
-            totalCarbs={store.totalCarbs}
-            totalFat={store.totalFat}
-            goals={store.state.goals}
-            todayWeight={store.todayWeight}
-            latestWeight={store.latestWeight}
-            onEditGoals={() => setShowGoalEditor(true)}
-          />
+          <div className="space-y-0">
+            <Dashboard
+              totalCaloriesIn={store.totalCaloriesIn}
+              totalCaloriesBurned={store.totalCaloriesBurned}
+              totalProtein={store.totalProtein}
+              totalCarbs={store.totalCarbs}
+              totalFat={store.totalFat}
+              goals={store.state.goals}
+              todayWeight={store.todayWeight}
+              latestWeight={store.latestWeight}
+              onEditGoals={() => setShowGoalEditor(true)}
+            />
+            {/* AI Calendar */}
+            <div className="px-4 pb-4">
+              <AICalendar
+                entries={store.state.aiHistory}
+                onRemove={store.removeAIHistory}
+              />
+            </div>
+            {/* Weight Tracker */}
+            <WeightTracker
+              entries={store.state.weightEntries}
+              goals={store.state.goals}
+              onUpsert={store.upsertWeightEntry}
+              onRemove={store.removeWeightEntry}
+            />
+          </div>
         )}
         {activeTab === 'food' && (
           <FoodTracker
@@ -58,14 +104,7 @@ export default function App() {
             onAdd={store.addTrainingSession}
             onRemove={store.removeTrainingSession}
             totalCaloriesBurned={store.totalCaloriesBurned}
-          />
-        )}
-        {activeTab === 'weight' && (
-          <WeightTracker
-            entries={store.state.weightEntries}
-            goals={store.state.goals}
-            onUpsert={store.upsertWeightEntry}
-            onRemove={store.removeWeightEntry}
+            onSaveAdviceHistory={(title, content, date) => handleSaveAIHistory('training', title, content, date)}
           />
         )}
         {activeTab === 'recipe' && (
@@ -73,11 +112,12 @@ export default function App() {
             goals={store.state.goals}
             remainingCalories={store.state.goals.calories - store.totalCaloriesIn + store.totalCaloriesBurned}
             remainingProtein={store.state.goals.protein - store.totalProtein}
+            onSaveHistory={(title, content, date) => handleSaveAIHistory('recipe', title, content, date)}
           />
         )}
       </main>
 
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab} onChange={handleTabChange} hidden={navHidden} />
 
       {showGoalEditor && (
         <GoalEditor

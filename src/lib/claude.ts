@@ -51,7 +51,7 @@ ${params.preferences || 'なし（何でも可）'}
 調理のコツや栄養的な特徴を2〜3点`;
 
   const stream = client.messages.stream({
-    model: 'claude-opus-4-6',
+    model: 'claude-sonnet-4-6',
     max_tokens: 2048,
     thinking: { type: 'adaptive' },
     messages: [{ role: 'user', content: prompt }],

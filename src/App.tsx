@@ -82,6 +82,7 @@ export default function App() {
       {showGoalEditor && (
         <GoalEditor
           goals={store.state.goals}
+          latestWeight={store.latestWeight}
           onSave={store.updateGoals}
           onClose={() => setShowGoalEditor(false)}
         />

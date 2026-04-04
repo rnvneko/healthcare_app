@@ -35,6 +35,8 @@ export interface DailyGoals {
   fat: number;
   targetWeight: number;
   targetBodyFat?: number;
+  targetDate?: string; // YYYY-MM-DD
+  activityLevel?: string; // sedentary | light | moderate | active | veryActive
 }
 
 export interface WeightEntry {

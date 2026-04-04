@@ -36,6 +36,7 @@ export default function App() {
             totalCarbs={store.totalCarbs}
             totalFat={store.totalFat}
             goals={store.state.goals}
+            todayWeight={store.todayWeight}
             latestWeight={store.latestWeight}
             onEditGoals={() => setShowGoalEditor(true)}
           />

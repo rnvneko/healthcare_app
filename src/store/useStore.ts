@@ -114,9 +114,11 @@ export function useStore() {
   const totalCarbs = todayFood.reduce((sum, e) => sum + e.carbs, 0);
   const totalFat = todayFood.reduce((sum, e) => sum + e.fat, 0);
 
-  // Latest weight
+  // Weight entries
   const sortedWeights = [...state.weightEntries].sort((a, b) => b.date.localeCompare(a.date));
   const latestWeight = sortedWeights[0];
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const todayWeight = state.weightEntries.find(w => w.date === todayDateStr);
 
   return {
     state,
@@ -128,6 +130,7 @@ export function useStore() {
     totalCarbs,
     totalFat,
     latestWeight,
+    todayWeight,
     sortedWeights,
     addFoodEntry,
     removeFoodEntry,

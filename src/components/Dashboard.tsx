@@ -7,6 +7,7 @@ interface Props {
   totalCarbs: number;
   totalFat: number;
   goals: DailyGoals;
+  todayWeight?: WeightEntry;
   latestWeight?: WeightEntry;
   onEditGoals: () => void;
 }
@@ -50,11 +51,33 @@ function MacroBar({ label, value, max, color }: { label: string; value: number; 
   );
 }
 
+const METRIC_DEFS: { key: keyof Omit<WeightEntry, 'id' | 'date' | 'weight'>; label: string; unit: string; color: string }[] = [
+  { key: 'bodyFat',        label: '体脂肪率',       unit: '%',   color: 'text-red-500' },
+  { key: 'muscleMass',     label: '筋肉量',          unit: 'kg',  color: 'text-blue-500' },
+  { key: 'bodyWater',      label: '体水分率',        unit: '%',   color: 'text-cyan-500' },
+  { key: 'bmi',            label: 'BMI',             unit: '',    color: 'text-indigo-500' },
+  { key: 'bmr',            label: '基礎代謝',        unit: 'kcal',color: 'text-orange-500' },
+  { key: 'visceralFat',    label: '内臓脂肪',        unit: 'lv',  color: 'text-amber-500' },
+  { key: 'boneMass',       label: '骨量',            unit: 'kg',  color: 'text-purple-500' },
+  { key: 'subcutaneousFat',label: '皮下脂肪率',      unit: '%',   color: 'text-pink-500' },
+  { key: 'proteinRate',    label: 'タンパク質率',    unit: '%',   color: 'text-green-500' },
+  { key: 'bodyAge',        label: '体年齢',          unit: '歳',  color: 'text-teal-500' },
+];
+
 export default function Dashboard({
-  totalCaloriesIn, totalCaloriesBurned, totalProtein, totalCarbs, totalFat, goals, latestWeight, onEditGoals
+  totalCaloriesIn, totalCaloriesBurned, totalProtein, totalCarbs, totalFat,
+  goals, todayWeight, latestWeight, onEditGoals
 }: Props) {
   const net = totalCaloriesIn - totalCaloriesBurned;
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+
+  // 表示する体重エントリ：当日 > 最新
+  const displayWeight = todayWeight ?? latestWeight;
+  const isTodayWeight = !!todayWeight;
+
+  const filledMetrics = displayWeight
+    ? METRIC_DEFS.filter(m => displayWeight[m.key] !== undefined)
+    : [];
 
   return (
     <div className="p-4 space-y-4">
@@ -69,6 +92,81 @@ export default function Dashboard({
         >
           目標設定
         </button>
+      </div>
+
+      {/* Body metrics card */}
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-gray-700">⚖️ 体重・身体データ</h2>
+          {displayWeight && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              isTodayWeight ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {isTodayWeight ? '本日計測' : `最新 ${displayWeight.date}`}
+            </span>
+          )}
+        </div>
+
+        {displayWeight ? (
+          <>
+            {/* Weight + goal diff */}
+            <div className="flex items-end gap-4 mb-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">体重</p>
+                <p className="text-4xl font-bold text-gray-900 leading-none">
+                  {displayWeight.weight}
+                  <span className="text-lg font-normal text-gray-400 ml-1">kg</span>
+                </p>
+              </div>
+              <div className="pb-1">
+                <p className="text-xs text-gray-400 mb-0.5">目標まで</p>
+                <p className={`text-xl font-bold ${displayWeight.weight > goals.targetWeight ? 'text-red-500' : 'text-green-500'}`}>
+                  {displayWeight.weight > goals.targetWeight
+                    ? `あと ${(displayWeight.weight - goals.targetWeight).toFixed(1)} kg`
+                    : '目標達成！🎉'}
+                </p>
+              </div>
+            </div>
+
+            {/* Weight progress bar */}
+            {displayWeight.weight > goals.targetWeight && (
+              <div className="mb-4">
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-400 to-indigo-500 rounded-full"
+                    style={{
+                      width: `${Math.max(5, Math.min(95, (goals.targetWeight / displayWeight.weight) * 100))}%`
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>目標 {goals.targetWeight}kg</span>
+                  <span>現在 {displayWeight.weight}kg</span>
+                </div>
+              </div>
+            )}
+
+            {/* Other metrics grid */}
+            {filledMetrics.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {filledMetrics.map(({ key, label, unit, color }) => (
+                  <div key={key} className="bg-gray-50 rounded-xl p-2.5 text-center">
+                    <p className={`text-base font-bold ${color}`}>
+                      {displayWeight[key]}{unit}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5 leading-tight">{label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-4 text-gray-400">
+            <p className="text-3xl mb-2">⚖️</p>
+            <p className="text-sm">体重が記録されていません</p>
+            <p className="text-xs mt-1">「📅 体重」タブから記録しましょう</p>
+          </div>
+        )}
       </div>
 
       {/* Calorie Summary Card */}
@@ -91,7 +189,6 @@ export default function Dashboard({
             <div className="text-xs text-gray-400">kcal</div>
           </div>
         </div>
-
         <div className="mt-4 flex items-center gap-2">
           <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
             <div
@@ -102,28 +199,6 @@ export default function Dashboard({
           <span className="text-xs text-gray-500 whitespace-nowrap">{goals.calories} kcal 目標</span>
         </div>
       </div>
-
-      {/* Weight summary */}
-      {latestWeight && (
-        <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-2xl">⚖️</div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500">最新の体重（{latestWeight.date}）</p>
-            <p className="text-2xl font-bold text-gray-900">{latestWeight.weight} <span className="text-sm font-normal text-gray-500">kg</span></p>
-            {latestWeight.bodyFat !== undefined && (
-              <p className="text-xs text-gray-500">体脂肪率: {latestWeight.bodyFat}%</p>
-            )}
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400">目標まで</p>
-            <p className={`text-lg font-bold ${latestWeight.weight > goals.targetWeight ? 'text-red-500' : 'text-green-500'}`}>
-              {latestWeight.weight > goals.targetWeight
-                ? `-${(latestWeight.weight - goals.targetWeight).toFixed(1)}kg`
-                : '達成！🎉'}
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Progress Rings */}
       <div className="bg-white rounded-2xl shadow-sm p-4">

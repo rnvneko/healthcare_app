@@ -15,27 +15,25 @@ export default function App() {
   const store = useStore();
 
   const lastScrollY = useRef(0);
-  const scrollThreshold = useRef(0);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const currentY = e.currentTarget.scrollTop;
     const delta = currentY - lastScrollY.current;
-
-    scrollThreshold.current += delta;
-    if (scrollThreshold.current > 40) {
-      setNavHidden(true);
-      scrollThreshold.current = 0;
-    } else if (scrollThreshold.current < -20 || currentY < 50) {
-      setNavHidden(false);
-      scrollThreshold.current = 0;
-    }
     lastScrollY.current = currentY;
+
+    if (currentY < 60) {
+      setNavHidden(false);
+    } else if (delta > 5) {
+      setNavHidden(true);
+    } else if (delta < -5) {
+      setNavHidden(false);
+    }
   }, []);
 
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
     setNavHidden(false);
-    scrollThreshold.current = 0;
+    lastScrollY.current = 0;
   }, []);
 
   function handleSaveAIHistory(type: 'recipe' | 'training', title: string, content: string, date: string) {

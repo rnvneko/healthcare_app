@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { WeightEntry, DailyGoals } from '../types';
+import type { WeightEntry, DailyGoals, AIHistoryEntry } from '../types';
 
 interface Props {
   entries: WeightEntry[];
   goals: DailyGoals;
   onUpsert: (entry: Omit<WeightEntry, 'id'>) => void;
   onRemove: (date: string) => void;
+  aiHistory: AIHistoryEntry[];
+  onRemoveAIHistory: (id: string) => void;
 }
 
 type GraphRange = '7d' | '30d' | 'all';
@@ -63,27 +65,18 @@ function WeightGraph({ entries, goal, range }: { entries: WeightEntry[]; goal: n
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 140 }}>
-      {/* Goal line */}
       <line x1={PAD.l} y1={goalY} x2={W - PAD.r} y2={goalY}
         stroke="#6366f1" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6" />
       <text x={W - PAD.r - 2} y={goalY - 3} fontSize="9" fill="#6366f1" textAnchor="end">目標</text>
-
-      {/* Weight line */}
       <path d={linePath} fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* Dots */}
       {filtered.map((e, i) => (
         <circle key={e.date} cx={xScale(i)} cy={yScale(e.weight)} r="3" fill="#f97316" />
       ))}
-
-      {/* Y axis labels */}
       {[minW + 1, (minW + maxW) / 2, maxW - 1].map(v => (
         <text key={v} x={PAD.l - 3} y={yScale(v) + 3} fontSize="9" fill="#9ca3af" textAnchor="end">
           {v.toFixed(1)}
         </text>
       ))}
-
-      {/* X axis labels (first and last) */}
       <text x={PAD.l} y={H - 4} fontSize="9" fill="#9ca3af" textAnchor="middle">
         {filtered[0].date.slice(5)}
       </text>
@@ -94,119 +87,181 @@ function WeightGraph({ entries, goal, range }: { entries: WeightEntry[]; goal: n
   );
 }
 
-function WeightInputForm({
+function MarkdownText({ text }: { text: string }) {
+  return (
+    <div className="space-y-0.5 text-xs text-gray-700">
+      {text.split('\n').map((line, i) => {
+        if (line.startsWith('## ')) return <p key={i} className="font-bold text-gray-900 mt-1">{line.slice(3)}</p>;
+        if (line.startsWith('### ')) return <p key={i} className="font-semibold text-gray-800 mt-1">{line.slice(4)}</p>;
+        if (line.startsWith('- ')) return <li key={i} className="ml-3 list-disc">{line.slice(2)}</li>;
+        if (line.trim() === '') return <br key={i} />;
+        return <p key={i}>{line}</p>;
+      })}
+    </div>
+  );
+}
+
+// Day detail bottom sheet: weight input + AI entries
+function DaySheet({
   date,
-  initial,
-  onSave,
-  onDelete,
+  weightEntry,
+  aiEntries,
+  onSaveWeight,
+  onDeleteWeight,
+  onRemoveAI,
   onClose,
 }: {
   date: string;
-  initial?: WeightEntry;
-  onSave: (entry: Omit<WeightEntry, 'id'>) => void;
-  onDelete: () => void;
+  weightEntry?: WeightEntry;
+  aiEntries: AIHistoryEntry[];
+  onSaveWeight: (entry: Omit<WeightEntry, 'id'>) => void;
+  onDeleteWeight: () => void;
+  onRemoveAI: (id: string) => void;
   onClose: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({
-    weight: String(initial?.weight ?? ''),
-    bmi: String(initial?.bmi ?? ''),
-    bodyFat: String(initial?.bodyFat ?? ''),
-    bodyWater: String(initial?.bodyWater ?? ''),
-    muscleMass: String(initial?.muscleMass ?? ''),
-    boneMass: String(initial?.boneMass ?? ''),
-    bmr: String(initial?.bmr ?? ''),
-    visceralFat: String(initial?.visceralFat ?? ''),
-    subcutaneousFat: String(initial?.subcutaneousFat ?? ''),
-    proteinRate: String(initial?.proteinRate ?? ''),
-    bodyAge: String(initial?.bodyAge ?? ''),
+    weight: String(weightEntry?.weight ?? ''),
+    bmi: String(weightEntry?.bmi ?? ''),
+    bodyFat: String(weightEntry?.bodyFat ?? ''),
+    bodyWater: String(weightEntry?.bodyWater ?? ''),
+    muscleMass: String(weightEntry?.muscleMass ?? ''),
+    boneMass: String(weightEntry?.boneMass ?? ''),
+    bmr: String(weightEntry?.bmr ?? ''),
+    visceralFat: String(weightEntry?.visceralFat ?? ''),
+    subcutaneousFat: String(weightEntry?.subcutaneousFat ?? ''),
+    proteinRate: String(weightEntry?.proteinRate ?? ''),
+    bodyAge: String(weightEntry?.bodyAge ?? ''),
   });
+  const [expandedAI, setExpandedAI] = useState<string | null>(null);
+  const [showWeightForm, setShowWeightForm] = useState(!weightEntry);
 
-  function handleSave() {
+  function handleSaveWeight() {
     if (!values.weight) return;
     const num = (k: string) => values[k] !== '' ? Number(values[k]) : undefined;
-    onSave({
+    onSaveWeight({
       date,
       weight: Number(values.weight),
-      bmi: num('bmi'),
-      bodyFat: num('bodyFat'),
-      bodyWater: num('bodyWater'),
-      muscleMass: num('muscleMass'),
-      boneMass: num('boneMass'),
-      bmr: num('bmr'),
-      visceralFat: num('visceralFat'),
-      subcutaneousFat: num('subcutaneousFat'),
-      proteinRate: num('proteinRate'),
-      bodyAge: num('bodyAge'),
+      bmi: num('bmi'), bodyFat: num('bodyFat'), bodyWater: num('bodyWater'),
+      muscleMass: num('muscleMass'), boneMass: num('boneMass'), bmr: num('bmr'),
+      visceralFat: num('visceralFat'), subcutaneousFat: num('subcutaneousFat'),
+      proteinRate: num('proteinRate'), bodyAge: num('bodyAge'),
     });
     onClose();
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md p-5 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-gray-900">{date} の記録</h2>
-          <button onClick={onClose} className="text-gray-400 text-xl">×</button>
+      <div className="bg-white rounded-3xl w-full max-w-md max-h-[88vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+          <h2 className="font-bold text-gray-900">{date}</h2>
+          <button onClick={onClose} className="text-gray-400 text-xl w-8 h-8 flex items-center justify-center">×</button>
         </div>
 
-        {/* Weight (required) */}
-        <div>
-          <label className="text-sm font-medium text-orange-500 mb-1 block">体重 (kg) ★</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            placeholder="例: 75.2"
-            value={values.weight}
-            onChange={e => setValues(v => ({ ...v, weight: e.target.value }))}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-300"
-          />
-        </div>
-
-        {/* Optional metrics */}
-        <div>
-          <p className="text-xs text-gray-500 mb-2">Smart Scale P2 Pro 計測値（任意）</p>
-          <div className="grid grid-cols-2 gap-2">
-            {METRICS.map(({ key, label, unit }) => (
-              <div key={key}>
-                <label className="text-xs text-gray-500 mb-1 block">{label}{unit ? ` (${unit})` : ''}</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  placeholder="-"
-                  value={values[key]}
-                  onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          {initial && (
+        <div className="overflow-y-auto flex-1 px-5 pb-5 space-y-4">
+          {/* ── Weight section ── */}
+          <div className="border border-gray-100 rounded-2xl overflow-hidden">
             <button
-              onClick={() => { onDelete(); onClose(); }}
-              className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm hover:bg-red-50"
+              onClick={() => setShowWeightForm(v => !v)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
             >
-              削除
+              <div className="flex items-center gap-2">
+                <span>⚖️</span>
+                <span className="text-sm font-semibold text-gray-700">体重記録</span>
+                {weightEntry && (
+                  <span className="text-sm font-bold text-orange-500">{weightEntry.weight} kg</span>
+                )}
+              </div>
+              <span className="text-gray-400 text-xs">{showWeightForm ? '▲' : weightEntry ? '編集▼' : '+ 記録▼'}</span>
             </button>
+
+            {showWeightForm && (
+              <div className="p-3 space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-orange-500 mb-1 block">体重 (kg) ★</label>
+                  <input
+                    type="number" step="0.1" min="0" placeholder="例: 75.2"
+                    value={values.weight}
+                    onChange={e => setValues(v => ({ ...v, weight: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-2">Smart Scale P2 Pro（任意）</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {METRICS.map(({ key, label, unit }) => (
+                      <div key={key}>
+                        <label className="text-xs text-gray-500 mb-1 block">{label}{unit ? ` (${unit})` : ''}</label>
+                        <input
+                          type="number" step="0.1" min="0" placeholder="-"
+                          value={values[key]}
+                          onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {weightEntry && (
+                    <button
+                      onClick={() => { onDeleteWeight(); onClose(); }}
+                      className="px-3 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm hover:bg-red-50"
+                    >削除</button>
+                  )}
+                  <button
+                    onClick={handleSaveWeight}
+                    disabled={!values.weight}
+                    className="flex-1 bg-orange-500 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium hover:bg-orange-600"
+                  >保存する</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── AI entries ── */}
+          {aiEntries.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500">AIプラン</p>
+              {aiEntries.map(entry => (
+                <div key={entry.id} className="border border-gray-100 rounded-2xl overflow-hidden">
+                  <button
+                    onClick={() => setExpandedAI(expandedAI === entry.id ? null : entry.id)}
+                    className="w-full flex items-center gap-2 p-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    <span>{entry.type === 'recipe' ? '🍽️' : '💪'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{entry.title}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${entry.type === 'recipe' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {entry.type === 'recipe' ? 'レシピ' : 'トレーニング'}
+                    </span>
+                    <span className="text-gray-400 text-xs">{expandedAI === entry.id ? '▲' : '▼'}</span>
+                  </button>
+                  {expandedAI === entry.id && (
+                    <div className="p-3 border-t border-gray-50">
+                      <MarkdownText text={entry.content} />
+                      <button
+                        onClick={() => onRemoveAI(entry.id)}
+                        className="mt-2 text-xs text-red-400 hover:text-red-600"
+                      >削除する</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
-          <button
-            onClick={handleSave}
-            disabled={!values.weight}
-            className="flex-1 bg-orange-500 disabled:opacity-50 text-white rounded-xl py-2.5 font-medium hover:bg-orange-600"
-          >
-            保存する
-          </button>
+
+          {aiEntries.length === 0 && !weightEntry && (
+            <p className="text-center text-sm text-gray-400 py-2">この日の記録はありません</p>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-export default function WeightTracker({ entries, goals, onUpsert, onRemove }: Props) {
+export default function WeightTracker({ entries, goals, onUpsert, onRemove, aiHistory, onRemoveAIHistory }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -217,24 +272,30 @@ export default function WeightTracker({ entries, goals, onUpsert, onRemove }: Pr
   const entryMap = Object.fromEntries(entries.map(e => [e.date, e]));
   const latest = [...entries].sort((a, b) => b.date.localeCompare(a.date))[0];
 
-  // Calendar
+  // AI history grouped by registeredDate
+  const aiByDate: Record<string, AIHistoryEntry[]> = {};
+  for (const h of aiHistory) {
+    if (h.registeredDate) {
+      if (!aiByDate[h.registeredDate]) aiByDate[h.registeredDate] = [];
+      aiByDate[h.registeredDate].push(h);
+    }
+  }
+  const unregisteredAI = aiHistory.filter(h => !h.registeredDate);
+
+  // Calendar grid
   const firstDay = new Date(currentMonth.year, currentMonth.month, 1);
   const lastDay = new Date(currentMonth.year, currentMonth.month + 1, 0);
-  const startDow = (firstDay.getDay() + 6) % 7; // Mon=0
+  const startDow = (firstDay.getDay() + 6) % 7;
   const today = toDateStr(new Date());
 
   const calendarDays: (string | null)[] = [
     ...Array(startDow).fill(null),
-    ...Array.from({ length: lastDay.getDate() }, (_, i) => {
-      const d = new Date(currentMonth.year, currentMonth.month, i + 1);
-      return toDateStr(d);
-    }),
+    ...Array.from({ length: lastDay.getDate() }, (_, i) =>
+      toDateStr(new Date(currentMonth.year, currentMonth.month, i + 1))
+    ),
   ];
   while (calendarDays.length % 7 !== 0) calendarDays.push(null);
 
-  const selectedEntry = selectedDate ? entryMap[selectedDate] : undefined;
-
-  // Progress
   const diff = latest ? latest.weight - goals.targetWeight : null;
 
   return (
@@ -307,60 +368,84 @@ export default function WeightTracker({ entries, goals, onUpsert, onRemove }: Pr
         <WeightGraph entries={entries} goal={goals.targetWeight} range={graphRange} />
       </div>
 
-      {/* Calendar */}
+      {/* Unified Calendar */}
       <div className="bg-white rounded-2xl shadow-sm p-4">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => setCurrentMonth(m => {
-              const d = new Date(m.year, m.month - 1, 1);
-              return { year: d.getFullYear(), month: d.getMonth() };
-            })}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
-          >◀</button>
-          <h2 className="text-sm font-semibold text-gray-700">
-            {currentMonth.year}年{currentMonth.month + 1}月
-          </h2>
-          <button
-            onClick={() => setCurrentMonth(m => {
-              const d = new Date(m.year, m.month + 1, 1);
-              return { year: d.getFullYear(), month: d.getMonth() };
-            })}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
-          >▶</button>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-700">カレンダー</h2>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentMonth(m => {
+                const d = new Date(m.year, m.month - 1, 1);
+                return { year: d.getFullYear(), month: d.getMonth() };
+              })}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+            >‹</button>
+            <span className="text-sm font-medium text-gray-700 w-20 text-center">
+              {currentMonth.year}年{currentMonth.month + 1}月
+            </span>
+            <button
+              onClick={() => setCurrentMonth(m => {
+                const d = new Date(m.year, m.month + 1, 1);
+                return { year: d.getFullYear(), month: d.getMonth() };
+              })}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+            >›</button>
+          </div>
         </div>
 
         {/* Day headers */}
         <div className="grid grid-cols-7 mb-1">
-          {['月', '火', '水', '木', '金', '土', '日'].map(d => (
-            <div key={d} className="text-center text-xs text-gray-400 py-1">{d}</div>
+          {['月', '火', '水', '木', '金', '土', '日'].map((d, i) => (
+            <div key={d} className={`text-center text-xs font-medium py-1 ${i === 5 ? 'text-blue-400' : i === 6 ? 'text-red-400' : 'text-gray-400'}`}>{d}</div>
           ))}
         </div>
 
         {/* Days */}
-        <div className="grid grid-cols-7 gap-y-1">
+        <div className="grid grid-cols-7 gap-y-0.5">
           {calendarDays.map((date, i) => {
             if (!date) return <div key={i} />;
-            const entry = entryMap[date];
+            const weightEntry = entryMap[date];
+            const dayAI = aiByDate[date] ?? [];
             const isToday = date === today;
+            const dow = (startDow + parseInt(date.slice(8)) - 1) % 7;
             return (
               <button
                 key={date}
                 onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center py-1 rounded-xl transition-colors ${
+                className={`flex flex-col items-center py-1 px-0.5 rounded-xl transition-colors min-h-[44px] justify-start pt-1.5 ${
                   isToday ? 'bg-indigo-50' : 'hover:bg-gray-50'
                 }`}
               >
-                <span className={`text-xs ${isToday ? 'font-bold text-indigo-600' : 'text-gray-600'}`}>
-                  {new Date(date).getDate()}
+                <span className={`text-xs leading-none mb-0.5 ${
+                  isToday ? 'font-bold text-indigo-600' :
+                  dow === 5 ? 'text-blue-500' :
+                  dow === 6 ? 'text-red-500' :
+                  'text-gray-600'
+                }`}>
+                  {new Date(date + 'T00:00:00').getDate()}
                 </span>
-                {entry ? (
-                  <span className="text-xs font-medium text-orange-500 leading-tight">{entry.weight}</span>
-                ) : (
-                  <span className="text-xs text-gray-200">·</span>
+                {weightEntry && (
+                  <span className="text-xs font-semibold text-orange-500 leading-tight">
+                    {weightEntry.weight}
+                  </span>
+                )}
+                {dayAI.length > 0 && (
+                  <span className="flex gap-0.5 mt-0.5">
+                    {dayAI.slice(0, 3).map((e, j) => (
+                      <span key={j} className={`w-1.5 h-1.5 rounded-full ${e.type === 'recipe' ? 'bg-orange-400' : 'bg-blue-400'}`} />
+                    ))}
+                  </span>
                 )}
               </button>
             );
           })}
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
+          <span className="text-xs text-orange-500 font-semibold">75.0 = 体重(kg)</span>
+          <span className="flex items-center gap-1 text-xs text-gray-400"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />レシピ</span>
+          <span className="flex items-center gap-1 text-xs text-gray-400"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />トレーニング</span>
         </div>
 
         <button
@@ -371,13 +456,33 @@ export default function WeightTracker({ entries, goals, onUpsert, onRemove }: Pr
         </button>
       </div>
 
-      {/* Input modal */}
+      {/* Unregistered AI history */}
+      {unregisteredAI.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm p-4 space-y-2">
+          <p className="text-sm font-semibold text-gray-700">未登録のAI生成履歴</p>
+          <p className="text-xs text-gray-400">カレンダーに登録するには、レシピ・トレーニングタブの「📅 登録」ボタンから日付を指定してください</p>
+          {unregisteredAI.map(entry => (
+            <div key={entry.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+              <span>{entry.type === 'recipe' ? '🍽️' : '💪'}</span>
+              <p className="flex-1 text-sm text-gray-700 truncate">{entry.title}</p>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${entry.type === 'recipe' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                {entry.type === 'recipe' ? 'レシピ' : 'トレーニング'}
+              </span>
+              <button onClick={() => onRemoveAIHistory(entry.id)} className="text-gray-300 hover:text-red-400 text-sm">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Day detail sheet */}
       {selectedDate && (
-        <WeightInputForm
+        <DaySheet
           date={selectedDate}
-          initial={selectedEntry}
-          onSave={onUpsert}
-          onDelete={() => onRemove(selectedDate)}
+          weightEntry={entryMap[selectedDate]}
+          aiEntries={aiByDate[selectedDate] ?? []}
+          onSaveWeight={onUpsert}
+          onDeleteWeight={() => onRemove(selectedDate)}
+          onRemoveAI={onRemoveAIHistory}
           onClose={() => setSelectedDate(null)}
         />
       )}

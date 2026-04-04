@@ -5,7 +5,6 @@ import FoodTracker from './components/FoodTracker';
 import TrainingTracker from './components/TrainingTracker';
 import WeightTracker from './components/WeightTracker';
 import RecipePlanner from './components/RecipePlanner';
-import AICalendar from './components/AICalendar';
 import BottomNav, { type Tab } from './components/BottomNav';
 import GoalEditor from './components/GoalEditor';
 
@@ -71,19 +70,13 @@ export default function App() {
               latestWeight={store.latestWeight}
               onEditGoals={() => setShowGoalEditor(true)}
             />
-            {/* AI Calendar */}
-            <div className="px-4 pb-4">
-              <AICalendar
-                entries={store.state.aiHistory}
-                onRemove={store.removeAIHistory}
-              />
-            </div>
-            {/* Weight Tracker */}
             <WeightTracker
               entries={store.state.weightEntries}
               goals={store.state.goals}
               onUpsert={store.upsertWeightEntry}
               onRemove={store.removeWeightEntry}
+              aiHistory={store.state.aiHistory}
+              onRemoveAIHistory={store.removeAIHistory}
             />
           </div>
         )}

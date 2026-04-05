@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DailyGoals, WeightEntry } from '../types';
+import { todayStr } from '../lib/dateUtils';
 
 interface Props {
   goals: DailyGoals;
@@ -124,7 +125,7 @@ export default function GoalEditor({ goals, latestWeight, onSave, onClose }: Pro
     onClose();
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const daysUntilTarget = form.targetDate
     ? Math.round((new Date(form.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
@@ -202,7 +203,7 @@ export default function GoalEditor({ goals, latestWeight, onSave, onClose }: Pro
               <label className="text-xs font-medium text-gray-600 mb-1 block">目標達成日</label>
               <input
                 type="date"
-                min={todayStr}
+                min={today}
                 value={form.targetDate}
                 onChange={e => setForm(f => ({ ...f, targetDate: e.target.value }))}
                 className="w-full border border-indigo-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"

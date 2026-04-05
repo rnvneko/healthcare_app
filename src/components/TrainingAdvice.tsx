@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { generateTrainingAdvice, type TrainingAdviceParams } from '../lib/claude';
 import type { TrainingSession } from '../types';
+import { todayStr } from '../lib/dateUtils';
 
 interface Props {
   todaySessions: TrainingSession[];
@@ -46,7 +47,7 @@ export default function TrainingAdvice({ todaySessions, onClose, onSaveHistory }
   const [advice, setAdvice] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [registerDate, setRegisterDate] = useState(new Date().toISOString().slice(0, 10));
+  const [registerDate, setRegisterDate] = useState(todayStr());
   const [registered, setRegistered] = useState(false);
 
   function toggleMuscle(m: string) {

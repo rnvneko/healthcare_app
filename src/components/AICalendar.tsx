@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AIHistoryEntry } from '../types';
+import { toLocalDateStr } from '../lib/dateUtils';
 
 interface Props {
   entries: AIHistoryEntry[];
@@ -51,7 +52,7 @@ export default function AICalendar({ entries, onRemove }: Props) {
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDow = getFirstDayOfWeek(year, month);
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = toLocalDateStr(today);
 
   // Group registered entries by date
   const byDate: Record<string, AIHistoryEntry[]> = {};

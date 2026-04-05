@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { generateRecipe } from '../lib/claude';
 import type { DailyGoals } from '../types';
+import { todayStr } from '../lib/dateUtils';
 
 interface Props {
   goals: DailyGoals;
@@ -58,7 +59,7 @@ export default function RecipePlanner({ remainingCalories, remainingProtein, onS
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<{ mealType: string; recipe: string }[]>([]);
-  const [registerDate, setRegisterDate] = useState(new Date().toISOString().slice(0, 10));
+  const [registerDate, setRegisterDate] = useState(todayStr());
   const [registered, setRegistered] = useState(false);
 
   async function handleGenerate() {

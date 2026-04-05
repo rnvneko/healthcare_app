@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { WeightEntry, DailyGoals, AIHistoryEntry } from '../types';
+import { toLocalDateStr, todayStr } from '../lib/dateUtils';
 
 interface Props {
   entries: WeightEntry[];
@@ -26,7 +27,7 @@ const METRICS: { key: keyof Omit<WeightEntry, 'id' | 'date' | 'weight'>; label: 
 ];
 
 function toDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 
 function WeightGraph({ entries, goal, range }: { entries: WeightEntry[]; goal: number; range: GraphRange }) {
@@ -286,7 +287,7 @@ export default function WeightTracker({ entries, goals, onUpsert, onRemove, aiHi
   const firstDay = new Date(currentMonth.year, currentMonth.month, 1);
   const lastDay = new Date(currentMonth.year, currentMonth.month + 1, 0);
   const startDow = (firstDay.getDay() + 6) % 7;
-  const today = toDateStr(new Date());
+  const today = todayStr();
 
   const calendarDays: (string | null)[] = [
     ...Array(startDow).fill(null),

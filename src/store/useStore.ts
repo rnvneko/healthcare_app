@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { todayStr, todayStartISO } from '../lib/dateUtils';
 import type { FoodEntry, TrainingSession, DailyGoals, AppState, WeightEntry, AIHistoryEntry } from '../types';
 
 const defaultGoals: DailyGoals = {
@@ -118,13 +119,11 @@ export function useStore() {
 
   async function loadAll(userId: string) {
     setLoading(true);
-    const todayStr = new Date().toISOString().slice(0, 10);
-
     const [food, training, weight, ai, goals] = await Promise.all([
       supabase.from('food_entries').select('*').eq('user_id', userId)
-        .gte('timestamp', `${todayStr}T00:00:00`).order('timestamp'),
+        .gte('timestamp', todayStartISO()).order('timestamp'),
       supabase.from('training_sessions').select('*').eq('user_id', userId)
-        .gte('timestamp', `${todayStr}T00:00:00`).order('timestamp'),
+        .gte('timestamp', todayStartISO()).order('timestamp'),
       supabase.from('weight_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
       supabase.from('ai_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       supabase.from('user_goals').select('*').eq('user_id', userId).maybeSingle(),
@@ -152,7 +151,7 @@ export function useStore() {
   const totalCarbs = state.foodEntries.reduce((s, e) => s + e.carbs, 0);
   const totalFat = state.foodEntries.reduce((s, e) => s + e.fat, 0);
 
-  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const todayDateStr = todayStr();
   const todayFood = state.foodEntries;
   const todayTraining = state.trainingSessions;
 

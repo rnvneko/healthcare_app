@@ -7,4 +7,5 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  base: './', // Capacitor requires relative paths
 })

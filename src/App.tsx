@@ -5,6 +5,7 @@ import FoodTracker from './components/FoodTracker';
 import TrainingTracker from './components/TrainingTracker';
 import WeightTracker from './components/WeightTracker';
 import RecipePlanner from './components/RecipePlanner';
+import AuthScreen from './components/AuthScreen';
 import BottomNav, { type Tab } from './components/BottomNav';
 import GoalEditor from './components/GoalEditor';
 
@@ -40,6 +41,21 @@ export default function App() {
     store.addAIHistory({ type, title, content, registeredDate: date });
   }
 
+  // Show auth screen if not logged in
+  if (!store.loading && !store.user) return <AuthScreen />;
+
+  // Loading screen
+  if (store.loading) {
+    return (
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center text-white text-lg font-bold mx-auto animate-pulse">FG</div>
+          <p className="text-sm text-gray-400">データを読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-gray-50 flex flex-col">
       {/* Header */}
@@ -47,10 +63,16 @@ export default function App() {
         <div className="w-8 h-8 bg-indigo-500 rounded-xl flex items-center justify-center text-white text-sm font-bold">
           FG
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-base font-bold text-gray-900 leading-tight">FitGoal</h1>
           <p className="text-xs text-gray-400 leading-tight">フィットネス & 食事管理</p>
         </div>
+        <button
+          onClick={store.signOut}
+          className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-50"
+        >
+          ログアウト
+        </button>
       </header>
 
       {/* Main content */}

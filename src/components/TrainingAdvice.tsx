@@ -11,7 +11,7 @@ interface Props {
 
 const TIME_OPTIONS = [30, 45, 60, 90, 120];
 const CALORIE_OPTIONS = [200, 300, 400, 500, 600];
-const MUSCLE_OPTIONS = ['胸', '背中', '肩', '腕（二頭）', '腕（三頭）', '脚', '臀部', '体幹', '全身'];
+const MUSCLE_OPTIONS = ['胸', '背中', '肩', '腕（二頭）', '腕（三頭）', '脚', '臀部', '腹筋', '体幹', '全身'];
 const LEVEL_OPTIONS = ['初心者', '中級者', '上級者'];
 const STYLE_OPTIONS = ['マシン中心', 'フリーウェイト', '混合'];
 const ADVICE_OPTIONS = [

@@ -94,16 +94,36 @@ function mapGoals(row: any): DailyGoals {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+const STATE_CACHE_KEY = 'fitgoal_state_cache';
+const RECENT_CACHE_KEY = 'fitgoal_recent_cache';
+
+function loadCache(): { state: AppState; recentFoods: typeof defaultState[]; recentExerciseNames: string[] } | null {
+  try {
+    const raw = localStorage.getItem(STATE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export function useStore() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [state, setState] = useState<AppState>(defaultState);
-  const [recentFoods, setRecentFoods] = useState<Array<{ name: string; calories: number; protein: number; carbs: number; fat: number }>>([]);
-  const [recentExerciseNames, setRecentExerciseNames] = useState<string[]>([]);
+
+  // Initialize from cache so UI is instant on reload
+  const cached = loadCache();
+  const [state, setState] = useState<AppState>(cached?.state ?? defaultState);
+  const [recentFoods, setRecentFoods] = useState<Array<{ name: string; calories: number; protein: number; carbs: number; fat: number }>>(
+    () => { try { const r = localStorage.getItem(RECENT_CACHE_KEY); return r ? JSON.parse(r).foods ?? [] : []; } catch { return []; } }
+  );
+  const [recentExerciseNames, setRecentExerciseNames] = useState<string[]>(
+    () => { try { const r = localStorage.getItem(RECENT_CACHE_KEY); return r ? JSON.parse(r).exercises ?? [] : []; } catch { return []; } }
+  );
 
   // ── Auth + initial data load ─────────────────────────────────────────────
 
   useEffect(() => {
+    // If we have cached data, hide loading immediately
+    if (loadCache()) setLoading(false);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) loadAll(session.user.id);
@@ -166,12 +186,28 @@ export function useStore() {
         if (ex.name) seenEx.add(ex.name);
       });
     });
-    setRecentExerciseNames([...seenEx].slice(0, 20));
+    const exerciseNames = [...seenEx].slice(0, 20);
+    setRecentExerciseNames(exerciseNames);
+
+    // Save to cache for instant display on next load
+    const newState = {
+      foodEntries: (food.data ?? []).map(mapFood),
+      trainingSessions: (training.data ?? []).map(mapTraining),
+      weightEntries: (weight.data ?? []).map(mapWeight),
+      aiHistory: (ai.data ?? []).map(mapAI),
+      goals: goals.data ? mapGoals(goals.data) : defaultGoals,
+    };
+    try {
+      localStorage.setItem(STATE_CACHE_KEY, JSON.stringify({ state: newState }));
+      localStorage.setItem(RECENT_CACHE_KEY, JSON.stringify({ foods: uniqueFoods, exercises: exerciseNames }));
+    } catch { /* storage full — skip cache */ }
 
     setLoading(false);
   }
 
   async function signOut() {
+    localStorage.removeItem(STATE_CACHE_KEY);
+    localStorage.removeItem(RECENT_CACHE_KEY);
     await supabase.auth.signOut();
   }
 

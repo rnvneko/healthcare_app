@@ -9,6 +9,7 @@ interface Props {
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+  recentFoods: Array<{ name: string; calories: number; protein: number; carbs: number; fat: number }>;
 }
 
 const PRESETS = [
@@ -21,19 +22,34 @@ const PRESETS = [
 ];
 
 const emptyForm = { name: '', calories: '', protein: '', carbs: '', fat: '' };
+const DRAFT_KEY = 'food_form_draft';
 
-export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, totalProtein, totalCarbs, totalFat }: Props) {
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, totalProtein, totalCarbs, totalFat, recentFoods }: Props) {
+  const [showForm, setShowForm] = useState(() => !!sessionStorage.getItem(DRAFT_KEY));
+  const [form, setForm] = useState<typeof emptyForm>(() => {
+    const saved = sessionStorage.getItem(DRAFT_KEY);
+    return saved ? JSON.parse(saved) : emptyForm;
+  });
 
-  function handlePreset(preset: typeof PRESETS[0]) {
-    setForm({
+  // Persist draft to sessionStorage on every change
+  const updateForm = (updater: (prev: typeof emptyForm) => typeof emptyForm) => {
+    setForm(prev => {
+      const next = updater(prev);
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  function handlePreset(preset: { name: string; calories: number; protein: number; carbs: number; fat: number }) {
+    const next = {
       name: preset.name,
       calories: String(preset.calories),
       protein: String(preset.protein),
       carbs: String(preset.carbs),
       fat: String(preset.fat),
-    });
+    };
+    setForm(next);
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(next));
     setShowForm(true);
   }
 
@@ -48,6 +64,7 @@ export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, t
       fat: Number(form.fat) || 0,
     });
     setForm(emptyForm);
+    sessionStorage.removeItem(DRAFT_KEY);
     setShowForm(false);
   }
 
@@ -83,9 +100,27 @@ export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, t
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <h2 className="font-semibold text-gray-700 mb-3">食品を追加</h2>
 
-          {/* Quick presets */}
+          {/* Recent history quick-add */}
+          {recentFoods.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-2">過去の記録から追加</p>
+              <div className="flex flex-wrap gap-2">
+                {recentFoods.map(f => (
+                  <button
+                    key={f.name}
+                    onClick={() => handlePreset(f)}
+                    className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg px-2 py-1 transition-colors"
+                  >
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Built-in presets */}
           <div className="mb-3">
-            <p className="text-xs text-gray-500 mb-2">クイック追加</p>
+            <p className="text-xs text-gray-500 mb-2">プリセット</p>
             <div className="flex flex-wrap gap-2">
               {PRESETS.map(p => (
                 <button
@@ -104,52 +139,43 @@ export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, t
               required
               placeholder="食品名"
               value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              onChange={e => updateForm(f => ({ ...f, name: e.target.value }))}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">カロリー (kcal) *</label>
                 <input
-                  required
-                  type="number"
-                  min="0"
-                  placeholder="0"
+                  required type="number" min="0" placeholder="0"
                   value={form.calories}
-                  onChange={e => setForm(f => ({ ...f, calories: e.target.value }))}
+                  onChange={e => updateForm(f => ({ ...f, calories: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">タンパク質 (g)</label>
                 <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
+                  type="number" min="0" placeholder="0"
                   value={form.protein}
-                  onChange={e => setForm(f => ({ ...f, protein: e.target.value }))}
+                  onChange={e => updateForm(f => ({ ...f, protein: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">炭水化物 (g)</label>
                 <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
+                  type="number" min="0" placeholder="0"
                   value={form.carbs}
-                  onChange={e => setForm(f => ({ ...f, carbs: e.target.value }))}
+                  onChange={e => updateForm(f => ({ ...f, carbs: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">脂質 (g)</label>
                 <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
+                  type="number" min="0" placeholder="0"
                   value={form.fat}
-                  onChange={e => setForm(f => ({ ...f, fat: e.target.value }))}
+                  onChange={e => updateForm(f => ({ ...f, fat: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>

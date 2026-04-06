@@ -10,7 +10,9 @@ import BottomNav, { type Tab } from './components/BottomNav';
 import GoalEditor from './components/GoalEditor';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>(() =>
+    (localStorage.getItem('activeTab') as Tab) ?? 'dashboard'
+  );
   const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [navHidden, setNavHidden] = useState(false);
   const store = useStore();
@@ -33,6 +35,7 @@ export default function App() {
 
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
+    localStorage.setItem('activeTab', tab);
     setNavHidden(false);
     lastScrollY.current = 0;
   }, []);
@@ -109,6 +112,7 @@ export default function App() {
             totalProtein={store.totalProtein}
             totalCarbs={store.totalCarbs}
             totalFat={store.totalFat}
+            recentFoods={store.recentFoods}
           />
         )}
         {activeTab === 'training' && (
@@ -118,6 +122,7 @@ export default function App() {
             onRemove={store.removeTrainingSession}
             totalCaloriesBurned={store.totalCaloriesBurned}
             onSaveAdviceHistory={(title, content, date) => handleSaveAIHistory('training', title, content, date)}
+            recentExerciseNames={store.recentExerciseNames}
           />
         )}
         {activeTab === 'recipe' && (

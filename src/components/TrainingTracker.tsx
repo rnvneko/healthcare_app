@@ -8,6 +8,7 @@ interface Props {
   onRemove: (id: string) => void;
   totalCaloriesBurned: number;
   onSaveAdviceHistory: (title: string, content: string, date: string) => void;
+  recentExerciseNames: string[];
 }
 
 const EXERCISE_PRESETS = [
@@ -19,7 +20,11 @@ const EXERCISE_PRESETS = [
   { name: 'ショルダープレス', caloriesPerMin: 7 },
   { name: 'トレッドミル（30分）', caloriesPerMin: 10 },
   { name: 'バイク（30分）', caloriesPerMin: 8 },
+  { name: 'ウォーキング', caloriesPerMin: 4 },
+  { name: 'ランニング', caloriesPerMin: 10 },
 ];
+
+const TRAINING_DRAFT_KEY = 'training_form_draft';
 
 function ExerciseRow({
   exercise,
@@ -94,35 +99,54 @@ function ExerciseRow({
   );
 }
 
-export default function TrainingTracker({ sessions, onAdd, onRemove, totalCaloriesBurned, onSaveAdviceHistory }: Props) {
-  const [showForm, setShowForm] = useState(false);
+export default function TrainingTracker({ sessions, onAdd, onRemove, totalCaloriesBurned, onSaveAdviceHistory, recentExerciseNames }: Props) {
+  const [showForm, setShowForm] = useState(() => !!sessionStorage.getItem(TRAINING_DRAFT_KEY));
   const [showAdvice, setShowAdvice] = useState(false);
-  const [sessionName, setSessionName] = useState('');
-  const [duration, setDuration] = useState('60');
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [customExerciseName, setCustomExerciseName] = useState('');
+
+  const loadDraft = () => {
+    const saved = sessionStorage.getItem(TRAINING_DRAFT_KEY);
+    if (saved) return JSON.parse(saved);
+    return { sessionName: '', duration: '60', exercises: [] };
+  };
+  const [draft, setDraft] = useState<{ sessionName: string; duration: string; exercises: Exercise[] }>(loadDraft);
+
+  const sessionName = draft.sessionName;
+  const duration = draft.duration;
+  const exercises = draft.exercises;
+
+  function updateDraft(updater: (prev: typeof draft) => typeof draft) {
+    setDraft(prev => {
+      const next = updater(prev);
+      sessionStorage.setItem(TRAINING_DRAFT_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+  const setSessionName = (v: string) => updateDraft(d => ({ ...d, sessionName: v }));
+  const setDuration = (v: string) => updateDraft(d => ({ ...d, duration: v }));
+  const setExercises = (fn: (prev: Exercise[]) => Exercise[]) =>
+    updateDraft(d => ({ ...d, exercises: fn(d.exercises) }));
 
   function addExercise(name: string, caloriesPerMin: number) {
+    if (exercises.some(e => e.name === name)) return;
     const cal = Math.round(caloriesPerMin * Number(duration || 60) / EXERCISE_PRESETS.length);
-    setExercises(prev => [...prev, {
-      name,
-      sets: [{ reps: 10, weight: 0 }],
-      caloriesBurned: cal,
-    }]);
+    setExercises(prev => [...prev, { name, sets: [{ reps: 10, weight: 0 }], caloriesBurned: cal }]);
+  }
+
+  function addCustomExercise() {
+    const name = customExerciseName.trim();
+    if (!name || exercises.some(e => e.name === name)) return;
+    setExercises(prev => [...prev, { name, sets: [{ reps: 10, weight: 0 }], caloriesBurned: 0 }]);
+    setCustomExerciseName('');
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!sessionName || exercises.length === 0) return;
     const total = exercises.reduce((s, ex) => s + ex.caloriesBurned, 0);
-    onAdd({
-      name: sessionName,
-      exercises,
-      totalCaloriesBurned: total,
-      duration: Number(duration) || 60,
-    });
-    setSessionName('');
-    setDuration('60');
-    setExercises([]);
+    onAdd({ name: sessionName, exercises, totalCaloriesBurned: total, duration: Number(duration) || 60 });
+    setDraft({ sessionName: '', duration: '60', exercises: [] });
+    sessionStorage.removeItem(TRAINING_DRAFT_KEY);
     setShowForm(false);
   }
 
@@ -175,8 +199,31 @@ export default function TrainingTracker({ sessions, onAdd, onRemove, totalCalori
             </div>
           </div>
 
+          {/* Past exercise history */}
+          {recentExerciseNames.filter(n => !EXERCISE_PRESETS.some(p => p.name === n)).length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2">過去の種目</p>
+              <div className="flex flex-wrap gap-2">
+                {recentExerciseNames
+                  .filter(n => !EXERCISE_PRESETS.some(p => p.name === n))
+                  .map(name => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => addExercise(name, 6)}
+                      disabled={exercises.some(e => e.name === name)}
+                      className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2 py-1 transition-colors"
+                    >
+                      {name}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Presets */}
           <div>
-            <p className="text-xs text-gray-500 mb-2">種目を選択</p>
+            <p className="text-xs text-gray-500 mb-2">プリセット種目</p>
             <div className="flex flex-wrap gap-2">
               {EXERCISE_PRESETS.map(p => (
                 <button
@@ -189,6 +236,29 @@ export default function TrainingTracker({ sessions, onAdd, onRemove, totalCalori
                   {p.name}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Free input */}
+          <div>
+            <p className="text-xs text-gray-500 mb-2">フリー入力</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="種目名を入力"
+                value={customExerciseName}
+                onChange={e => setCustomExerciseName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomExercise())}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+              <button
+                type="button"
+                onClick={addCustomExercise}
+                disabled={!customExerciseName.trim()}
+                className="bg-blue-100 hover:bg-blue-200 disabled:opacity-40 text-blue-700 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+              >
+                追加
+              </button>
             </div>
           </div>
 

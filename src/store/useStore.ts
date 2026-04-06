@@ -98,6 +98,8 @@ export function useStore() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<AppState>(defaultState);
+  const [recentFoods, setRecentFoods] = useState<Array<{ name: string; calories: number; protein: number; carbs: number; fat: number }>>([]);
+  const [recentExerciseNames, setRecentExerciseNames] = useState<string[]>([]);
 
   // ── Auth + initial data load ─────────────────────────────────────────────
 
@@ -119,7 +121,7 @@ export function useStore() {
 
   async function loadAll(userId: string) {
     setLoading(true);
-    const [food, training, weight, ai, goals] = await Promise.all([
+    const [food, training, weight, ai, goals, recentFoodRows, recentTrainingRows] = await Promise.all([
       supabase.from('food_entries').select('*').eq('user_id', userId)
         .gte('timestamp', todayStartISO()).order('timestamp'),
       supabase.from('training_sessions').select('*').eq('user_id', userId)
@@ -127,6 +129,12 @@ export function useStore() {
       supabase.from('weight_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
       supabase.from('ai_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       supabase.from('user_goals').select('*').eq('user_id', userId).maybeSingle(),
+      // Recent food history for quick-reuse (last 200 entries, deduplicated by name)
+      supabase.from('food_entries').select('name, calories, protein, carbs, fat')
+        .eq('user_id', userId).order('timestamp', { ascending: false }).limit(200),
+      // Recent exercises for quick-reuse
+      supabase.from('training_sessions').select('exercises')
+        .eq('user_id', userId).order('timestamp', { ascending: false }).limit(50),
     ]);
 
     setState({
@@ -136,6 +144,30 @@ export function useStore() {
       aiHistory: (ai.data ?? []).map(mapAI),
       goals: goals.data ? mapGoals(goals.data) : defaultGoals,
     });
+
+    // Deduplicate recent foods by name (keep most recent values)
+    const seenFood = new Set<string>();
+    const uniqueFoods = (recentFoodRows.data ?? []).filter(r => {
+      if (seenFood.has(r.name)) return false;
+      seenFood.add(r.name);
+      return true;
+    }).slice(0, 20).map(r => ({
+      name: r.name, calories: Number(r.calories),
+      protein: Number(r.protein), carbs: Number(r.carbs), fat: Number(r.fat),
+    }));
+    setRecentFoods(uniqueFoods);
+
+    // Deduplicate recent exercise names
+    const seenEx = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (recentTrainingRows.data ?? []).forEach((row: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (row.exercises ?? []).forEach((ex: any) => {
+        if (ex.name) seenEx.add(ex.name);
+      });
+    });
+    setRecentExerciseNames([...seenEx].slice(0, 20));
+
     setLoading(false);
   }
 
@@ -285,6 +317,8 @@ export function useStore() {
     todayTraining,
     latestWeight,
     todayWeight,
+    recentFoods,
+    recentExerciseNames,
     addFoodEntry,
     removeFoodEntry,
     addTrainingSession,

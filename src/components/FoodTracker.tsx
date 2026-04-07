@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FoodEntry } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface Props {
+  userId: string;
   entries: FoodEntry[];
   foodHistory: { date: string; entries: FoodEntry[] }[];
   onAdd: (entry: Omit<FoodEntry, 'id' | 'timestamp'>) => void;
@@ -25,7 +27,7 @@ const PRESETS = [
 const emptyForm = { name: '', calories: '', protein: '', carbs: '', fat: '' };
 const DRAFT_KEY = 'food_form_draft';
 
-export default function FoodTracker({ entries, foodHistory, onAdd, onRemove, totalCalories, totalProtein, totalCarbs, totalFat, recentFoods }: Props) {
+export default function FoodTracker({ userId, entries, foodHistory, onAdd, onRemove, totalCalories, totalProtein, totalCarbs, totalFat, recentFoods }: Props) {
   const [showForm, setShowForm] = useState(() => !!sessionStorage.getItem(DRAFT_KEY));
   const [form, setForm] = useState<typeof emptyForm>(() => {
     const saved = sessionStorage.getItem(DRAFT_KEY);
@@ -207,9 +209,7 @@ export default function FoodTracker({ entries, foodHistory, onAdd, onRemove, tot
       </div>
 
       {/* Past history */}
-      {foodHistory.length > 0 && (
-        <PastFoodHistory history={foodHistory} />
-      )}
+      <PastFoodHistory userId={userId} recentHistory={foodHistory} />
     </div>
   );
 }
@@ -227,9 +227,87 @@ function FoodEntryRow({ entry, onRemove }: { entry: FoodEntry; onRemove: () => v
   );
 }
 
-function PastFoodHistory({ history }: { history: { date: string; entries: FoodEntry[] }[] }) {
+// ── Past food history with month navigation ─────────────────────────────────
+
+function groupByDate(entries: FoodEntry[]) {
+  const map: Record<string, FoodEntry[]> = {};
+  for (const e of entries) {
+    const d = e.timestamp.slice(0, 10);
+    if (!map[d]) map[d] = [];
+    map[d].push(e);
+  }
+  return Object.entries(map)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, entries]) => ({ date, entries }));
+}
+
+function PastFoodHistory({
+  userId,
+  recentHistory,
+}: {
+  userId: string;
+  recentHistory: { date: string; entries: FoodEntry[] }[];
+}) {
+  const now = new Date();
+  // Default to previous month (today is in current month, shown separately)
+  const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+  const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const [year, setYear] = useState(prevYear);
+  const [month, setMonth] = useState(prevMonth); // 0-indexed
+  const [fetched, setFetched] = useState<Record<string, FoodEntry[]>>({}); // cache: "YYYY-MM" → entries
+  const [loading, setLoading] = useState(false);
   const [openDates, setOpenDates] = useState<Set<string>>(new Set());
-  function toggle(date: string) {
+
+  const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const isCurrentMonth = year === currentYear && month === currentMonth;
+
+  // Determine entries to show
+  const displayGroups: { date: string; entries: FoodEntry[] }[] = isCurrentMonth
+    ? recentHistory.filter(g => g.date.startsWith(key))
+    : (fetched[key] ? groupByDate(fetched[key]) : []);
+
+  // Fetch when month changes (skip current month — already loaded)
+  useEffect(() => {
+    if (isCurrentMonth) return;
+    if (fetched[key]) return; // already cached
+    fetchMonth();
+  }, [key]);
+
+  async function fetchMonth() {
+    setLoading(true);
+    const start = new Date(year, month, 1).toISOString();
+    const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+    const { data } = await supabase
+      .from('food_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('timestamp', start)
+      .lte('timestamp', end)
+      .order('timestamp', { ascending: false });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entries: FoodEntry[] = (data ?? []).map((r: any) => ({
+      id: r.id, name: r.name, calories: Number(r.calories),
+      protein: Number(r.protein), carbs: Number(r.carbs), fat: Number(r.fat),
+      timestamp: r.timestamp,
+    }));
+    setFetched(prev => ({ ...prev, [key]: entries }));
+    setLoading(false);
+  }
+
+  function prevMonthNav() {
+    if (month === 0) { setYear(y => y - 1); setMonth(11); }
+    else setMonth(m => m - 1);
+  }
+  function nextMonthNav() {
+    // Don't navigate past current month
+    if (year === currentYear && month === currentMonth) return;
+    if (month === 11) { setYear(y => y + 1); setMonth(0); }
+    else setMonth(m => m + 1);
+  }
+  function toggleDate(date: string) {
     setOpenDates(prev => {
       const next = new Set(prev);
       next.has(date) ? next.delete(date) : next.add(date);
@@ -237,42 +315,70 @@ function PastFoodHistory({ history }: { history: { date: string; entries: FoodEn
     });
   }
 
+  const isAtCurrentMonth = year === currentYear && month === currentMonth;
+
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-semibold text-gray-500 px-1">過去の食事記録</h2>
-      {history.map(({ date, entries }) => {
-        const totalCal = entries.reduce((s, e) => s + e.calories, 0);
-        const isOpen = openDates.has(date);
-        const [y, m, d] = date.split('-');
-        const label = `${Number(m)}/${Number(d)}（${totalCal}kcal）`;
-        return (
-          <div key={date} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <button
-              onClick={() => toggle(date)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700">{y}年 {label}</span>
-                <span className="text-xs text-gray-400">{entries.length}件</span>
-              </div>
-              <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
-            </button>
-            {isOpen && (
-              <div className="px-3 pb-3 space-y-2 border-t border-gray-50 pt-2">
-                {entries.map(entry => (
-                  <div key={entry.id} className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center text-base flex-shrink-0">🍱</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800 truncate">{entry.name}</p>
-                      <p className="text-xs text-gray-400">{entry.calories}kcal · P:{entry.protein}g · C:{entry.carbs}g · F:{entry.fat}g</p>
+      {/* Month navigator */}
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-gray-500">過去の食事記録</h2>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={prevMonthNav}
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+          >‹</button>
+          <span className="text-sm font-medium text-gray-700 w-20 text-center">
+            {year}年{month + 1}月
+          </span>
+          <button
+            onClick={nextMonthNav}
+            disabled={isAtCurrentMonth}
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 disabled:opacity-30"
+          >›</button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400">読み込み中...</div>
+      ) : displayGroups.length === 0 ? (
+        <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400">
+          {year}年{month + 1}月の記録はありません
+        </div>
+      ) : (
+        displayGroups.map(({ date, entries }) => {
+          const totalCal = entries.reduce((s, e) => s + e.calories, 0);
+          const isOpen = openDates.has(date);
+          const [y, m, d] = date.split('-');
+          return (
+            <div key={date} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <button
+                onClick={() => toggleDate(date)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">{y}年{Number(m)}/{Number(d)}（{totalCal}kcal）</span>
+                  <span className="text-xs text-gray-400">{entries.length}件</span>
+                </div>
+                <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+              </button>
+              {isOpen && (
+                <div className="px-3 pb-3 space-y-2 border-t border-gray-50 pt-2">
+                  {entries.map(entry => (
+                    <div key={entry.id} className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center text-base flex-shrink-0">🍱</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">{entry.name}</p>
+                        <p className="text-xs text-gray-400">{entry.calories}kcal · P:{entry.protein}g · C:{entry.carbs}g · F:{entry.fat}g</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

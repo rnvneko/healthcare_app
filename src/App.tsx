@@ -105,6 +105,7 @@ export default function App() {
         )}
         {activeTab === 'food' && (
           <FoodTracker
+            userId={store.user!.id}
             entries={store.todayFood}
             foodHistory={store.foodHistory}
             onAdd={store.addFoodEntry}

@@ -142,8 +142,10 @@ export function useStore() {
   async function loadAll(userId: string) {
     setLoading(true);
     const [food, training, weight, ai, goals, recentFoodRows, recentTrainingRows] = await Promise.all([
+      // Load last 30 days of food entries
       supabase.from('food_entries').select('*').eq('user_id', userId)
-        .gte('timestamp', todayStartISO()).order('timestamp'),
+        .gte('timestamp', new Date(Date.now() - 30 * 86400000).toISOString())
+        .order('timestamp', { ascending: false }),
       supabase.from('training_sessions').select('*').eq('user_id', userId)
         .gte('timestamp', todayStartISO()).order('timestamp'),
       supabase.from('weight_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
@@ -220,7 +222,22 @@ export function useStore() {
   const totalFat = state.foodEntries.reduce((s, e) => s + e.fat, 0);
 
   const todayDateStr = todayStr();
-  const todayFood = state.foodEntries;
+  const todayFood = state.foodEntries.filter(e => e.timestamp.slice(0, 10) >= todayDateStr);
+
+  // Past food entries grouped by date (excluding today), sorted newest first
+  const foodHistory: { date: string; entries: FoodEntry[] }[] = (() => {
+    const past = state.foodEntries.filter(e => e.timestamp.slice(0, 10) < todayDateStr);
+    const map: Record<string, FoodEntry[]> = {};
+    for (const e of past) {
+      const d = e.timestamp.slice(0, 10);
+      if (!map[d]) map[d] = [];
+      map[d].push(e);
+    }
+    return Object.entries(map)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, entries]) => ({ date, entries }));
+  })();
+
   const todayTraining = state.trainingSessions;
 
   const sortedWeights = [...state.weightEntries].sort((a, b) => b.date.localeCompare(a.date));
@@ -350,6 +367,7 @@ export function useStore() {
     totalCarbs,
     totalFat,
     todayFood,
+    foodHistory,
     todayTraining,
     latestWeight,
     todayWeight,

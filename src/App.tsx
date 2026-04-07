@@ -106,6 +106,7 @@ export default function App() {
         {activeTab === 'food' && (
           <FoodTracker
             entries={store.todayFood}
+            foodHistory={store.foodHistory}
             onAdd={store.addFoodEntry}
             onRemove={store.removeFoodEntry}
             totalCalories={store.totalCaloriesIn}

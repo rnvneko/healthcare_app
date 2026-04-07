@@ -3,6 +3,7 @@ import type { FoodEntry } from '../types';
 
 interface Props {
   entries: FoodEntry[];
+  foodHistory: { date: string; entries: FoodEntry[] }[];
   onAdd: (entry: Omit<FoodEntry, 'id' | 'timestamp'>) => void;
   onRemove: (id: string) => void;
   totalCalories: number;
@@ -24,7 +25,7 @@ const PRESETS = [
 const emptyForm = { name: '', calories: '', protein: '', carbs: '', fat: '' };
 const DRAFT_KEY = 'food_form_draft';
 
-export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, totalProtein, totalCarbs, totalFat, recentFoods }: Props) {
+export default function FoodTracker({ entries, foodHistory, onAdd, onRemove, totalCalories, totalProtein, totalCarbs, totalFat, recentFoods }: Props) {
   const [showForm, setShowForm] = useState(() => !!sessionStorage.getItem(DRAFT_KEY));
   const [form, setForm] = useState<typeof emptyForm>(() => {
     const saved = sessionStorage.getItem(DRAFT_KEY);
@@ -190,7 +191,7 @@ export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, t
         </div>
       )}
 
-      {/* Entries list */}
+      {/* Today entries */}
       <div className="space-y-2">
         {entries.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-400">
@@ -200,26 +201,78 @@ export default function FoodTracker({ entries, onAdd, onRemove, totalCalories, t
           </div>
         ) : (
           entries.map(entry => (
-            <div key={entry.id} className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                🍱
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-800 text-sm truncate">{entry.name}</p>
-                <p className="text-xs text-gray-500">
-                  {entry.calories}kcal · P:{entry.protein}g · C:{entry.carbs}g · F:{entry.fat}g
-                </p>
-              </div>
-              <button
-                onClick={() => onRemove(entry.id)}
-                className="text-gray-300 hover:text-red-400 transition-colors text-lg px-1"
-              >
-                ×
-              </button>
-            </div>
+            <FoodEntryRow key={entry.id} entry={entry} onRemove={() => onRemove(entry.id)} />
           ))
         )}
       </div>
+
+      {/* Past history */}
+      {foodHistory.length > 0 && (
+        <PastFoodHistory history={foodHistory} />
+      )}
+    </div>
+  );
+}
+
+function FoodEntryRow({ entry, onRemove }: { entry: FoodEntry; onRemove: () => void }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
+      <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">🍱</div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-gray-800 text-sm truncate">{entry.name}</p>
+        <p className="text-xs text-gray-500">{entry.calories}kcal · P:{entry.protein}g · C:{entry.carbs}g · F:{entry.fat}g</p>
+      </div>
+      <button onClick={onRemove} className="text-gray-300 hover:text-red-400 transition-colors text-lg px-1">×</button>
+    </div>
+  );
+}
+
+function PastFoodHistory({ history }: { history: { date: string; entries: FoodEntry[] }[] }) {
+  const [openDates, setOpenDates] = useState<Set<string>>(new Set());
+  function toggle(date: string) {
+    setOpenDates(prev => {
+      const next = new Set(prev);
+      next.has(date) ? next.delete(date) : next.add(date);
+      return next;
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-sm font-semibold text-gray-500 px-1">過去の食事記録</h2>
+      {history.map(({ date, entries }) => {
+        const totalCal = entries.reduce((s, e) => s + e.calories, 0);
+        const isOpen = openDates.has(date);
+        const [y, m, d] = date.split('-');
+        const label = `${Number(m)}/${Number(d)}（${totalCal}kcal）`;
+        return (
+          <div key={date} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <button
+              onClick={() => toggle(date)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">{y}年 {label}</span>
+                <span className="text-xs text-gray-400">{entries.length}件</span>
+              </div>
+              <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+            </button>
+            {isOpen && (
+              <div className="px-3 pb-3 space-y-2 border-t border-gray-50 pt-2">
+                {entries.map(entry => (
+                  <div key={entry.id} className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center text-base flex-shrink-0">🍱</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 truncate">{entry.name}</p>
+                      <p className="text-xs text-gray-400">{entry.calories}kcal · P:{entry.protein}g · C:{entry.carbs}g · F:{entry.fat}g</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

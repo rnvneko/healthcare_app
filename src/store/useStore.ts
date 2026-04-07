@@ -96,11 +96,20 @@ function mapGoals(row: any): DailyGoals {
 
 const STATE_CACHE_KEY = 'fitgoal_state_cache';
 const RECENT_CACHE_KEY = 'fitgoal_recent_cache';
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1時間
 
 function loadCache(): { state: AppState; recentFoods: typeof defaultState[]; recentExerciseNames: string[] } | null {
   try {
     const raw = localStorage.getItem(STATE_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // TTL チェック: 期限切れキャッシュは無効化
+    if (parsed.cachedAt && Date.now() - parsed.cachedAt > CACHE_TTL_MS) {
+      localStorage.removeItem(STATE_CACHE_KEY);
+      localStorage.removeItem(RECENT_CACHE_KEY);
+      return null;
+    }
+    return parsed;
   } catch { return null; }
 }
 
@@ -200,7 +209,7 @@ export function useStore() {
       goals: goals.data ? mapGoals(goals.data) : defaultGoals,
     };
     try {
-      localStorage.setItem(STATE_CACHE_KEY, JSON.stringify({ state: newState }));
+      localStorage.setItem(STATE_CACHE_KEY, JSON.stringify({ state: newState, cachedAt: Date.now() }));
       localStorage.setItem(RECENT_CACHE_KEY, JSON.stringify({ foods: uniqueFoods, exercises: exerciseNames }));
     } catch { /* storage full — skip cache */ }
 

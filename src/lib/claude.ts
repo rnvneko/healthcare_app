@@ -1,23 +1,68 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { supabase } from './supabase';
 
-function getClient() {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY が設定されていません。.env ファイルを確認してください。');
-  return new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-}
+/**
+ * Supabase Edge Function (claude-proxy) 経由でClaudeにストリーミングリクエストを送る。
+ * Anthropic API キーはサーバー側にのみ保存され、ブラウザには露出しない。
+ */
+async function streamText(prompt: string, onChunk: (text: string) => void): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('ログインが必要です。');
 
-async function streamText(prompt: string, onChunk: (text: string) => void) {
-  const client = getClient();
-  const stream = client.messages.stream({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: prompt }],
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const edgeFunctionUrl = `${supabaseUrl}/functions/v1/claude-proxy`;
+
+  const response = await fetch(edgeFunctionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+    },
+    body: JSON.stringify({ prompt }),
   });
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      onChunk(event.delta.text);
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error ?? `API error: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('レスポンスの読み取りに失敗しました。');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6).trim();
+      if (payload === '[DONE]') return;
+
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.error) throw new Error(parsed.error);
+        if (parsed.text) onChunk(parsed.text);
+      } catch (e) {
+        if (e instanceof Error && e.message !== payload) throw e;
+      }
     }
   }
+}
+
+// ── 入力サニタイズ（プロンプトインジェクション対策） ──────────────────
+function sanitizeInput(text: string, maxLen = 500): string {
+  return text
+    .replace(/[<>]/g, '')          // HTMLタグ阻止
+    .replace(/\n{3,}/g, '\n\n')   // 過度な改行を削減
+    .slice(0, maxLen)
+    .trim();
 }
 
 export async function generateRecipe(
@@ -31,6 +76,8 @@ export async function generateRecipe(
   },
   onChunk: (text: string) => void,
 ): Promise<void> {
+  const safePreferences = sanitizeInput(params.preferences);
+
   const prompt = `あなたは栄養士兼シェフです。以下の条件に合った${params.mealType}のレシピを1つ考案してください。
 
 【栄養目標】
@@ -40,7 +87,7 @@ export async function generateRecipe(
 - 脂質: 約${params.fat}g
 
 【好みや制約】
-${params.preferences || 'なし（何でも可）'}
+${safePreferences || 'なし（何でも可）'}
 
 以下のフォーマットで回答してください：
 

@@ -88,6 +88,14 @@ export default function GoalEditor({ goals, latestWeight, onSave, onClose }: Pro
       setCalcError('現在体重・目標体重・目標日付を入力してください');
       return;
     }
+    if (cw < 20 || cw > 300 || tw < 20 || tw > 300) {
+      setCalcError('体重は20〜300kgの範囲で入力してください');
+      return;
+    }
+    if (new Date(form.targetDate) <= new Date()) {
+      setCalcError('目標日付は今日より後の日付を設定してください');
+      return;
+    }
     const result = calcNutrition(
       cw,
       form.currentBodyFat ? parseFloat(form.currentBodyFat) : undefined,

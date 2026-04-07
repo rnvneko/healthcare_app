@@ -143,8 +143,11 @@ export default function TrainingTracker({ sessions, onAdd, onRemove, totalCalori
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!sessionName || exercises.length === 0) return;
+    const dur = Number(duration) || 60;
+    // 時間: 1〜1440分（1日）の範囲チェック
+    if (dur < 1 || dur > 1440) return;
     const total = exercises.reduce((s, ex) => s + ex.caloriesBurned, 0);
-    onAdd({ name: sessionName, exercises, totalCaloriesBurned: total, duration: Number(duration) || 60 });
+    onAdd({ name: sessionName.trim().slice(0, 100), exercises, totalCaloriesBurned: total, duration: dur });
     setDraft({ sessionName: '', duration: '60', exercises: [] });
     sessionStorage.removeItem(TRAINING_DRAFT_KEY);
     setShowForm(false);

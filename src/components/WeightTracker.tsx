@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { WeightEntry, DailyGoals, AIHistoryEntry } from '../types';
 import { toLocalDateStr, todayStr } from '../lib/dateUtils';
+import MarkdownText from './MarkdownText';
 
 interface Props {
   entries: WeightEntry[];
@@ -88,19 +89,6 @@ function WeightGraph({ entries, goal, range }: { entries: WeightEntry[]; goal: n
   );
 }
 
-function MarkdownText({ text }: { text: string }) {
-  return (
-    <div className="space-y-0.5 text-xs text-gray-700">
-      {text.split('\n').map((line, i) => {
-        if (line.startsWith('## ')) return <p key={i} className="font-bold text-gray-900 mt-1">{line.slice(3)}</p>;
-        if (line.startsWith('### ')) return <p key={i} className="font-semibold text-gray-800 mt-1">{line.slice(4)}</p>;
-        if (line.startsWith('- ')) return <li key={i} className="ml-3 list-disc">{line.slice(2)}</li>;
-        if (line.trim() === '') return <br key={i} />;
-        return <p key={i}>{line}</p>;
-      })}
-    </div>
-  );
-}
 
 // Day detail bottom sheet: weight input + AI entries
 function DaySheet({
@@ -138,14 +126,27 @@ function DaySheet({
 
   function handleSaveWeight() {
     if (!values.weight) return;
-    const num = (k: string) => values[k] !== '' ? Number(values[k]) : undefined;
+    const w = Number(values.weight);
+    // 体重: 20〜300kg の範囲チェック
+    if (w < 20 || w > 300) return;
+    const num = (k: string, min: number, max: number) => {
+      if (values[k] === '') return undefined;
+      const n = Number(values[k]);
+      return (n >= min && n <= max) ? n : undefined;
+    };
     onSaveWeight({
       date,
-      weight: Number(values.weight),
-      bmi: num('bmi'), bodyFat: num('bodyFat'), bodyWater: num('bodyWater'),
-      muscleMass: num('muscleMass'), boneMass: num('boneMass'), bmr: num('bmr'),
-      visceralFat: num('visceralFat'), subcutaneousFat: num('subcutaneousFat'),
-      proteinRate: num('proteinRate'), bodyAge: num('bodyAge'),
+      weight: w,
+      bmi:             num('bmi', 10, 60),
+      bodyFat:         num('bodyFat', 0, 70),
+      bodyWater:       num('bodyWater', 0, 100),
+      muscleMass:      num('muscleMass', 0, 200),
+      boneMass:        num('boneMass', 0, 10),
+      bmr:             num('bmr', 500, 5000),
+      visceralFat:     num('visceralFat', 0, 30),
+      subcutaneousFat: num('subcutaneousFat', 0, 60),
+      proteinRate:     num('proteinRate', 0, 50),
+      bodyAge:         num('bodyAge', 5, 120),
     });
     onClose();
   }

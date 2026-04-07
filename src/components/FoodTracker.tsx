@@ -58,14 +58,15 @@ export default function FoodTracker({ userId, entries, foodHistory, onAdd, onRem
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name || !form.calories) return;
-    onAdd({
-      name: form.name,
-      calories: Number(form.calories),
-      protein: Number(form.protein) || 0,
-      carbs: Number(form.carbs) || 0,
-      fat: Number(form.fat) || 0,
-    });
+    if (!form.name.trim() || !form.calories) return;
+    const cal = Number(form.calories);
+    const pro = Number(form.protein) || 0;
+    const carb = Number(form.carbs) || 0;
+    const fat = Number(form.fat) || 0;
+    // 入力バリデーション
+    if (cal < 0 || cal > 10000) return;
+    if (pro < 0 || pro > 1000 || carb < 0 || carb > 1000 || fat < 0 || fat > 1000) return;
+    onAdd({ name: form.name.trim().slice(0, 100), calories: cal, protein: pro, carbs: carb, fat });
     setForm(emptyForm);
     sessionStorage.removeItem(DRAFT_KEY);
     setShowForm(false);

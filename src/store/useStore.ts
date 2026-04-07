@@ -215,14 +215,15 @@ export function useStore() {
 
   // ── Computed values ──────────────────────────────────────────────────────
 
-  const totalCaloriesIn = state.foodEntries.reduce((s, e) => s + e.calories, 0);
-  const totalCaloriesBurned = state.trainingSessions.reduce((s, e) => s + e.totalCaloriesBurned, 0);
-  const totalProtein = state.foodEntries.reduce((s, e) => s + e.protein, 0);
-  const totalCarbs = state.foodEntries.reduce((s, e) => s + e.carbs, 0);
-  const totalFat = state.foodEntries.reduce((s, e) => s + e.fat, 0);
-
   const todayDateStr = todayStr();
   const todayFood = state.foodEntries.filter(e => e.timestamp.slice(0, 10) >= todayDateStr);
+
+  // Daily totals based on today only
+  const totalCaloriesIn = todayFood.reduce((s, e) => s + e.calories, 0);
+  const totalCaloriesBurned = state.trainingSessions.reduce((s, e) => s + e.totalCaloriesBurned, 0);
+  const totalProtein = todayFood.reduce((s, e) => s + e.protein, 0);
+  const totalCarbs = todayFood.reduce((s, e) => s + e.carbs, 0);
+  const totalFat = todayFood.reduce((s, e) => s + e.fat, 0);
 
   // Past food entries grouped by date (excluding today), sorted newest first
   const foodHistory: { date: string; entries: FoodEntry[] }[] = (() => {
